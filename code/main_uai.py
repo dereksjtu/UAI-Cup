@@ -92,8 +92,8 @@ def training_offline(train,test):
             'metric': 'rmse',
             'num_leaves': 4,
             # 'num_leaves': 4,
-            'learning_rate': 0.1,
-            # 'learning_rate': 0.05,
+            # 'learning_rate': 0.1,
+            'learning_rate': 0.05,
             'feature_fraction': 0.8,
             'bagging_fraction': 0.8,
             'bagging_freq': 5,
@@ -111,7 +111,7 @@ def training_offline(train,test):
     print('Feature names:', lgb_model.feature_name())
     print('Feature importances:', list(lgb_model.feature_importance()))
     se = pd.Series(list(lgb_model.feature_importance()), index=lgb_model.feature_name())
-    se.to_csv('param.csv')
+    se.to_csv('param_offline.csv')
     print se
     test_feats.loc[:,'result'] = lgb_model.predict(test_feats[predictors])
 
@@ -126,21 +126,55 @@ def training_online(train,test):
     predictors = [f for f in train_feats.columns if f not in do_not_use_list]
     print predictors
 
-    import xgboost as xgb
-    params = {'min_child_weight': 100, 'eta': 0.05, 'colsample_bytree': 0.8, 'max_depth': 8,
-                    'subsample': 0.8, 'lambda': 1, 'nthread': 4, 'booster' : 'gbtree', 'silent': 1,
-                    'eval_metric': 'rmse', 'objective': 'reg:linear','seed':2017}
-    boostRound = 200
+    train_feats = train_feats[train_feats['create_date'] >= '2017-07-22'].copy()
+    # import xgboost as xgb
+    # params = {'min_child_weight': 100, 'eta': 0.05, 'colsample_bytree': 0.8, 'max_depth': 8,
+    #                 'subsample': 0.8, 'lambda': 1, 'nthread': 4, 'booster' : 'gbtree', 'silent': 1,
+    #                 'eval_metric': 'rmse', 'objective': 'reg:linear','seed':2017}
+    # boostRound = 200
+    #
+    #
+    # xgbtrain = xgb.DMatrix(train_feats_trip[predictors], train_feats_trip['demand_count'],missing=np.nan)
+    # xgbtest = xgb.DMatrix(test_feats[predictors],missing=np.nan)
+    # model = xgb.train(params, xgbtrain, num_boost_round=boostRound)
+    # param_score = pd.Series(model.get_fscore()).sort_values(ascending=False)
+    # print param_score
+    #
+    # test.loc[:,'count'] = model.predict(xgbtest)
+    # test['count'].fillna(1,inplace=True)
+    # test['test_id'] = test['test_id'].astype('int')
+    # test[['test_id','count']].to_csv('result.csv',index=False)
 
-    train_feats_trip = train_feats[train_feats['create_date'] >= '2017-07-22'].copy()
+    params_lgb = {
+            'boosting_type': 'gbdt',
+            'objective': 'regression',
+            'min_child_weight':10,
+            'metric': 'rmse',
+            'num_leaves': 4,
+            # 'num_leaves': 4,
+            # 'learning_rate': 0.1,
+            'learning_rate': 0.05,
+            'feature_fraction': 0.8,
+            'bagging_fraction': 0.8,
+            'bagging_freq': 5,
+            'verbose': 1,
+            'lambda_l2': 1,
+            'seed':2017
+        }
+    X = train_feats[predictors]
+    y = train_feats['demand_count']
+    x_train, x_test, y_train, y_test = train_test_split(X, y, train_size=0.8, random_state=1)
+    train_data = lgb.Dataset(x_train,label=y_train,feature_name=predictors)
+    bst=lgb.cv(params_lgb,train_data, num_boost_round=1000, nfold=5, early_stopping_rounds=30)
+    print 'number of boosted round:',len(bst['rmse-mean'])
+    lgb_model = lgb.train(params_lgb,train_data,num_boost_round=len(bst['rmse-mean']))
+    print('Feature names:', lgb_model.feature_name())
+    print('Feature importances:', list(lgb_model.feature_importance()))
+    se = pd.Series(list(lgb_model.feature_importance()), index=lgb_model.feature_name())
+    se.to_csv('param_online.csv')
+    print se
 
-    xgbtrain = xgb.DMatrix(train_feats_trip[predictors], train_feats_trip['demand_count'],missing=np.nan)
-    xgbtest = xgb.DMatrix(test_feats[predictors],missing=np.nan)
-    model = xgb.train(params, xgbtrain, num_boost_round=boostRound)
-    param_score = pd.Series(model.get_fscore()).sort_values(ascending=False)
-    print param_score
-
-    test.loc[:,'count'] = model.predict(xgbtest)
+    test.loc[:,'count'] = lgb_model.predict(test_feats[predictors])
     test['count'].fillna(1,inplace=True)
     test['test_id'] = test['test_id'].astype('int')
     test[['test_id','count']].to_csv('result.csv',index=False)
@@ -160,10 +194,10 @@ if __name__ == '__main__':
     test = pd.read_csv(test_path,encoding='gbk')
 
     train = reshape_train(train_jul)
-    valid = valid_split(train_aug)
-    training_offline(train,valid)
+    # valid = valid_split(train_aug)
+    # training_offline(train,valid)
 
-    # training_online(train,test)
+    training_online(train,test)
     print(u'一共用时{}秒'.format(time.time()-t0))
 
 
