@@ -1,0 +1,169 @@
+# -*- coding:utf-8 -*-
+# Ignore warnings
+import warnings
+warnings.filterwarnings('ignore')
+
+# Handle table like and matrices
+import pandas as pd
+import numpy as np
+
+# system
+import os
+import time
+
+# self-defined model
+from feature_uai import *
+
+# Modeling
+from sklearn.cross_validation import train_test_split
+import lightgbm as lgb
+import xgboost as xgb
+
+cache_path = '../../UAI_data/output/cache'
+
+poi_path = '../../UAI_data/input/poi_re.csv'
+train_Aug_path = '../../UAI_data/input/train_Aug_re.csv'
+train_Jul_path = '../../UAI_data/input/train_July_re.csv'
+train_jul_demand_path = '../../UAI_data/input/tain_jul_demand.csv'
+train_aug_demand_path = '../../UAI_data/input/tain_aug_demand.csv'
+location_path = '../../UAI_data/input/location_cls.csv'
+holiday_path = '../../UAI_data/input/holiday.csv'
+weather_path = '../../UAI_data/input/weather.csv'
+test_path = '../../UAI_data/input/test.csv'
+
+def score(pred,valid):
+    pred_l = list(pred)
+    valid_l = list(valid)
+    sum_ = 0
+    for i in range(len(pred_l)):
+        sum_ += abs(pred_l[i] - valid_l[i])
+    return sum_ / (1.0 * len(pred_l))
+
+def gbm_cv(x_train,y_train,params):
+    # params = {
+    #         'boosting_type': 'gbdt',
+    #         'objective': 'regression',
+    #         'min_child_weight':10,
+    #         'metric': 'rmse',
+    #         # 'num_leaves': 8,
+    #         'num_leaves': 4,
+    #         # 'learning_rate': 0.1,
+    #         'learning_rate': 0.05,
+    #         'feature_fraction': 0.8,
+    #         'bagging_fraction': 0.8,
+    #         'bagging_freq': 5,
+    #         'verbose': 1,
+    #         'lambda_l2': 1
+    #     }
+
+    train_data = lgb.Dataset(x_train, y_train)
+    bst=lgb.cv(params,train_data, num_boost_round=5000, nfold=5, early_stopping_rounds=100)
+    # print bst
+    return bst
+
+def training_offline(train,test):
+    train_feats,test_feats = get_feats(train,test)
+    print np.setdiff1d(train_feats.columns,test_feats.columns)
+    print np.setdiff1d(test_feats.columns,train_feats.columns)
+    do_not_use_list = ['create_date','demand_count','estimate_distance_mean','estimate_money_mean','estimate_term_mean','test_id']
+    predictors = [f for f in train_feats.columns if f not in do_not_use_list]
+    print predictors
+    train_feats = train_feats[train_feats['create_date'] >= '2017-07-22'].copy()
+
+    # import xgboost as xgb
+    # params = {'min_child_weight': 10, 'eta': 0.05, 'colsample_bytree': 0.8, 'max_depth': 8,
+    #                 'subsample': 0.8, 'lambda': 1, 'nthread': 4, 'booster' : 'gbtree', 'silent': 1,
+    #                 'eval_metric': 'rmse', 'objective': 'reg:linear','seed':2017}
+    # boostRound = 500
+    #
+    #
+    # xgbtrain = xgb.DMatrix(train_feats_trip[predictors], train_feats_trip['demand_count'],missing=np.nan)
+    # xgbvalid = xgb.DMatrix(test_feats[predictors],missing=np.nan)
+    # model = xgb.train(params, xgbtrain, num_boost_round=boostRound)
+    # param_score = pd.Series(model.get_fscore()).sort_values(ascending=False)
+    # print param_score
+    # test_feats.loc[:,'result'] = model.predict(xgbvalid)
+    # test_feats['result'].fillna(1,inplace=True)
+
+    params_lgb = {
+            'boosting_type': 'gbdt',
+            'objective': 'regression',
+            'min_child_weight':10,
+            'metric': 'rmse',
+            'num_leaves': 4,
+            # 'num_leaves': 4,
+            'learning_rate': 0.1,
+            # 'learning_rate': 0.05,
+            'feature_fraction': 0.8,
+            'bagging_fraction': 0.8,
+            'bagging_freq': 5,
+            'verbose': 1,
+            'lambda_l2': 1,
+            'seed':2017
+        }
+    X = train_feats[predictors]
+    y = train_feats['demand_count']
+    x_train, x_test, y_train, y_test = train_test_split(X, y, train_size=0.8, random_state=1)
+    train_data = lgb.Dataset(x_train,label=y_train,feature_name=predictors)
+    bst=lgb.cv(params_lgb,train_data, num_boost_round=1000, nfold=5, early_stopping_rounds=30)
+    print 'number of boosted round:',len(bst['rmse-mean'])
+    lgb_model = lgb.train(params_lgb,train_data,num_boost_round=len(bst['rmse-mean']))
+    print('Feature names:', lgb_model.feature_name())
+    print('Feature importances:', list(lgb_model.feature_importance()))
+    se = pd.Series(list(lgb_model.feature_importance()), index=lgb_model.feature_name())
+    se.to_csv('param.csv')
+    print se
+    test_feats.loc[:,'result'] = lgb_model.predict(test_feats[predictors])
+
+
+    print 'predictive score is: ',score(test_feats['result'],test_feats['demand_count'])
+
+def training_online(train,test):
+    train_feats,test_feats = get_feats(train,test)
+    print np.setdiff1d(train_feats.columns,test_feats.columns)
+    print np.setdiff1d(test_feats.columns,train_feats.columns)
+    do_not_use_list = ['create_date','demand_count','estimate_distance_mean','estimate_money_mean','estimate_term_mean','test_id']
+    predictors = [f for f in train_feats.columns if f not in do_not_use_list]
+    print predictors
+
+    import xgboost as xgb
+    params = {'min_child_weight': 100, 'eta': 0.05, 'colsample_bytree': 0.8, 'max_depth': 8,
+                    'subsample': 0.8, 'lambda': 1, 'nthread': 4, 'booster' : 'gbtree', 'silent': 1,
+                    'eval_metric': 'rmse', 'objective': 'reg:linear','seed':2017}
+    boostRound = 200
+
+    train_feats_trip = train_feats[train_feats['create_date'] >= '2017-07-22'].copy()
+
+    xgbtrain = xgb.DMatrix(train_feats_trip[predictors], train_feats_trip['demand_count'],missing=np.nan)
+    xgbtest = xgb.DMatrix(test_feats[predictors],missing=np.nan)
+    model = xgb.train(params, xgbtrain, num_boost_round=boostRound)
+    param_score = pd.Series(model.get_fscore()).sort_values(ascending=False)
+    print param_score
+
+    test.loc[:,'count'] = model.predict(xgbtest)
+    test['count'].fillna(1,inplace=True)
+    test['test_id'] = test['test_id'].astype('int')
+    test[['test_id','count']].to_csv('result.csv',index=False)
+
+
+
+if __name__ == '__main__':
+    t0 = time.time()
+    # poi = pd.read_csv(poi_path,encoding='gbk')
+    train_aug = pd.read_csv(train_Aug_path,encoding='gbk')
+    train_jul = pd.read_csv(train_Jul_path,encoding='gbk')
+    # train_jul_demand = pd.read_csv(train_jul_demand_path,encoding='gbk')
+    # train_aug_demand = pd.read_csv(train_aug_demand_path,encoding='gbk')
+    # loc_cls = pd.read_csv(location_path)
+    # holiday = pd.read_csv(holiday_path)
+    weather = pd.read_csv(weather_path)
+    test = pd.read_csv(test_path,encoding='gbk')
+
+    train = reshape_train(train_jul)
+    valid = valid_split(train_aug)
+    training_offline(train,valid)
+
+    # training_online(train,test)
+    print(u'一共用时{}秒'.format(time.time()-t0))
+
+
