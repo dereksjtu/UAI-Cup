@@ -189,6 +189,22 @@ def get_hour_demand(train,test):
 
     return train, test
 
+def get_weekday_demand(train,test):
+    coord_hour = train.groupby(['dayOfWeek','start_geo_id','end_geo_id'],as_index=False)['demand_count'].agg({'demand_count_weekday_avg':'mean'})
+    train = pd.merge(train,coord_hour,on=['dayOfWeek','start_geo_id','end_geo_id'],how='left')
+    test = pd.merge(test,coord_hour,on=['dayOfWeek','start_geo_id','end_geo_id'],how='left')
+    coord_hour = train.groupby(['dayOfWeek','start_geo_id','end_geo_id'],as_index=False)['demand_count'].agg({'demand_count_weekday_median':'median'})
+    train = pd.merge(train,coord_hour,on=['dayOfWeek','start_geo_id','end_geo_id'],how='left')
+    test = pd.merge(test,coord_hour,on=['dayOfWeek','start_geo_id','end_geo_id'],how='left')
+    coord_hour = train.groupby(['dayOfWeek','start_geo_id','end_geo_id'],as_index=False)['demand_count'].agg({'demand_count_weekday_max':'max'})
+    train = pd.merge(train,coord_hour,on=['dayOfWeek','start_geo_id','end_geo_id'],how='left')
+    test = pd.merge(test,coord_hour,on=['dayOfWeek','start_geo_id','end_geo_id'],how='left')
+    coord_hour = train.groupby(['dayOfWeek','start_geo_id','end_geo_id'],as_index=False)['demand_count'].agg({'demand_count_weekday_std':'std'})
+    train = pd.merge(train,coord_hour,on=['dayOfWeek','start_geo_id','end_geo_id'],how='left')
+    test = pd.merge(test,coord_hour,on=['dayOfWeek','start_geo_id','end_geo_id'],how='left')
+
+    return train, test
+
 def get_hour_loc_cls_demand(train,test):
     coord_hour = train.groupby(['create_hour','start_cluster','end_cluster'],as_index=False)['demand_count'].agg({'demand_count_cls_h_avg':'mean'})
     train = pd.merge(train,coord_hour,on=['create_hour','start_cluster','end_cluster'],how='left')
@@ -235,6 +251,55 @@ def get_hour_cls_demand(train,test):
 
     return train, test
 
+def get_hol_demand(train,test):
+    coord_hour = train.groupby(['holiday','start_geo_id','end_geo_id'],as_index=False)['demand_count'].agg({'demand_count_hc_avg':'mean'})
+    train = pd.merge(train,coord_hour,on=['hour_cls','start_geo_id','end_geo_id'],how='left')
+    test = pd.merge(test,coord_hour,on=['hour_cls','start_geo_id','end_geo_id'],how='left')
+    coord_hour = train.groupby(['hour_cls','start_geo_id','end_geo_id'],as_index=False)['demand_count'].agg({'demand_count_hc_median':'median'})
+    train = pd.merge(train,coord_hour,on=['hour_cls','start_geo_id','end_geo_id'],how='left')
+    test = pd.merge(test,coord_hour,on=['hour_cls','start_geo_id','end_geo_id'],how='left')
+    coord_hour = train.groupby(['hour_cls','start_geo_id','end_geo_id'],as_index=False)['demand_count'].agg({'demand_count_hc_max':'max'})
+    train = pd.merge(train,coord_hour,on=['hour_cls','start_geo_id','end_geo_id'],how='left')
+    test = pd.merge(test,coord_hour,on=['hour_cls','start_geo_id','end_geo_id'],how='left')
+    coord_hour = train.groupby(['hour_cls','start_geo_id','end_geo_id'],as_index=False)['demand_count'].agg({'demand_count_hc_std':'std'})
+    train = pd.merge(train,coord_hour,on=['hour_cls','start_geo_id','end_geo_id'],how='left')
+    test = pd.merge(test,coord_hour,on=['hour_cls','start_geo_id','end_geo_id'],how='left')
+
+    return train, test
+
+def get_hol_demand(train,test):
+    coord_hour = train.groupby(['holiday','start_geo_id','end_geo_id'],as_index=False)['demand_count'].agg({'demand_count_hol_avg':'mean'})
+    train = pd.merge(train,coord_hour,on=['holiday','start_geo_id','end_geo_id'],how='left')
+    test = pd.merge(test,coord_hour,on=['holiday','start_geo_id','end_geo_id'],how='left')
+    coord_hour = train.groupby(['holiday','start_geo_id','end_geo_id'],as_index=False)['demand_count'].agg({'demand_count_hol_median':'median'})
+    train = pd.merge(train,coord_hour,on=['holiday','start_geo_id','end_geo_id'],how='left')
+    test = pd.merge(test,coord_hour,on=['holiday','start_geo_id','end_geo_id'],how='left')
+    coord_hour = train.groupby(['holiday','start_geo_id','end_geo_id'],as_index=False)['demand_count'].agg({'demand_count_hol_max':'max'})
+    train = pd.merge(train,coord_hour,on=['holiday','start_geo_id','end_geo_id'],how='left')
+    test = pd.merge(test,coord_hour,on=['holiday','start_geo_id','end_geo_id'],how='left')
+    coord_hour = train.groupby(['holiday','start_geo_id','end_geo_id'],as_index=False)['demand_count'].agg({'demand_count_hol_std':'std'})
+    train = pd.merge(train,coord_hour,on=['holiday','start_geo_id','end_geo_id'],how='left')
+    test = pd.merge(test,coord_hour,on=['holiday','start_geo_id','end_geo_id'],how='left')
+
+    return train, test
+
+def get_hol_h_demand(train,test):
+    coord_hour = train.groupby(['holiday','create_hour','start_geo_id','end_geo_id'],as_index=False)['demand_count'].agg({'demand_count_hol_h_avg':'mean'})
+    train = pd.merge(train,coord_hour,on=['holiday','create_hour','start_geo_id','end_geo_id'],how='left')
+    test = pd.merge(test,coord_hour,on=['holiday','create_hour','start_geo_id','end_geo_id'],how='left')
+    coord_hour = train.groupby(['holiday','create_hour','start_geo_id','end_geo_id'],as_index=False)['demand_count'].agg({'demand_count_hol_h_median':'median'})
+    train = pd.merge(train,coord_hour,on=['holiday','create_hour','start_geo_id','end_geo_id'],how='left')
+    test = pd.merge(test,coord_hour,on=['holiday','create_hour','start_geo_id','end_geo_id'],how='left')
+    coord_hour = train.groupby(['holiday','create_hour','start_geo_id','end_geo_id'],as_index=False)['demand_count'].agg({'demand_count_hol_h_max':'max'})
+    train = pd.merge(train,coord_hour,on=['holiday','create_hour','start_geo_id','end_geo_id'],how='left')
+    test = pd.merge(test,coord_hour,on=['holiday','create_hour','start_geo_id','end_geo_id'],how='left')
+    coord_hour = train.groupby(['holiday','create_hour','start_geo_id','end_geo_id'],as_index=False)['demand_count'].agg({'demand_count_hol_h_std':'std'})
+    train = pd.merge(train,coord_hour,on=['holiday','create_hour','start_geo_id','end_geo_id'],how='left')
+    test = pd.merge(test,coord_hour,on=['holiday','create_hour','start_geo_id','end_geo_id'],how='left')
+
+    return train, test
+
+
 def get_feats(train,test):
     train,test = get_hol_feats(train,test)
     train,test = get_origin_feats(train,test)
@@ -242,6 +307,9 @@ def get_feats(train,test):
     train,test = get_loc_feats(train,test)
     train,test = time_handler(train,test)
     train,test = get_hour_demand(train,test)
+    train,test = get_hol_demand(train,test)
+    # train,test = get_hol_h_demand(train,test)
+    train,test = get_weekday_demand(train,test)
     train,test = get_hour_loc_cls_demand(train,test)
     train,test = get_hour_cls_demand(train,test)
     return train,test

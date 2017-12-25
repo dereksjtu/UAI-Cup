@@ -31,6 +31,15 @@ holiday_path = '../../UAI_data/input/holiday.csv'
 weather_path = '../../UAI_data/input/weather.csv'
 test_path = '../../UAI_data/input/test.csv'
 
+def score_lgb(pred,valid):
+    pred_l = pred
+    valid_l = valid.get_label()
+    sum_ = 0
+    for i in range(len(valid_l)):
+        sum_ += abs(pred_l[i] - valid_l[i])
+    print sum_ / (1.0 * len(valid_l))
+    return sum_ / (1.0 * len(valid_l))
+
 def score(pred,valid):
     pred_l = list(pred)
     valid_l = list(valid)
@@ -65,7 +74,7 @@ def training_offline(train,test):
     train_feats,test_feats = get_feats(train,test)
     print np.setdiff1d(train_feats.columns,test_feats.columns)
     print np.setdiff1d(test_feats.columns,train_feats.columns)
-    do_not_use_list = ['create_date','demand_count','estimate_distance_mean','estimate_money_mean','estimate_term_mean','test_id','dayOfWeek','demand_count_start_h_rate']
+    do_not_use_list = ['create_date','demand_count','estimate_distance_mean','estimate_money_mean','estimate_term_mean','test_id','demand_count_start_h_rate']
     predictors = [f for f in train_feats.columns if f not in do_not_use_list]
     print predictors
     # train_feats = train_feats[train_feats['create_date'] >= '2017-07-01'].copy()
@@ -88,7 +97,7 @@ def training_offline(train,test):
     params_lgb = {
             'boosting_type': 'gbdt',
             'objective': 'regression',
-            'min_child_weight':10,
+            'min_child_weight':80,
             'metric': 'rmse',
             'num_leaves': 4,
             # 'num_leaves': 4,
@@ -99,15 +108,27 @@ def training_offline(train,test):
             'bagging_freq': 5,
             'verbose': 1,
             'lambda_l2': 1,
+            # 'feval':score,
             'seed':2017
         }
     X = train_feats[predictors]
     y = train_feats['demand_count']
     x_train, x_test, y_train, y_test = train_test_split(X, y, train_size=0.8, random_state=1)
     train_data = lgb.Dataset(x_train,label=y_train,feature_name=predictors)
-    bst=lgb.cv(params_lgb,train_data, num_boost_round=1000, nfold=5, early_stopping_rounds=30)
+
+    bst=lgb.cv(params_lgb,train_data,num_boost_round=1000, nfold=5, early_stopping_rounds=30)
     print 'number of boosted round:',len(bst['rmse-mean'])
     lgb_model = lgb.train(params_lgb,train_data,num_boost_round=len(bst['rmse-mean']))
+
+    # lgb_train = lgb.Dataset(x_train, y_train)
+    # lgb_eval = lgb.Dataset(x_test, y_test, reference=lgb_train)
+    # lgb_model = lgb.train(params_lgb,
+    #                     lgb_train,
+    #                     num_boost_round=2000,
+    #                     feval=score_lgb,
+    #                     valid_sets=lgb_eval,
+    #                     early_stopping_rounds=100)
+
     print('Feature names:', lgb_model.feature_name())
     print('Feature importances:', list(lgb_model.feature_importance()))
     se = pd.Series(list(lgb_model.feature_importance()), index=lgb_model.feature_name())
@@ -123,7 +144,7 @@ def training_online(train,test):
     print np.setdiff1d(train_feats.columns,test_feats.columns)
     print np.setdiff1d(test_feats.columns,train_feats.columns)
     # do_not_use_list = ['create_date','demand_count','estimate_distance_mean','estimate_money_mean','estimate_term_mean','test_id']
-    do_not_use_list = ['create_date','demand_count','estimate_distance_mean','estimate_money_mean','estimate_term_mean','test_id','dayOfWeek','demand_count_start_h_rate']
+    do_not_use_list = ['create_date','demand_count','estimate_distance_mean','estimate_money_mean','estimate_term_mean','test_id','demand_count_start_h_rate']
     predictors = [f for f in train_feats.columns if f not in do_not_use_list]
     print predictors
 
@@ -149,7 +170,7 @@ def training_online(train,test):
     params_lgb = {
             'boosting_type': 'gbdt',
             'objective': 'regression',
-            'min_child_weight':10,
+            'min_child_weight':80,
             'metric': 'rmse',
             'num_leaves': 4,
             # 'num_leaves': 4,
@@ -197,7 +218,7 @@ if __name__ == '__main__':
     train = reshape_train(train_jul)
 
     # # Offline
-    # train_tr = train[train['create_date'] >= '2017-07-01']
+    # train_tr = train[train['create_date'] >= '2017-07-08']
     # train_tr = train[train['create_date'] < '2017-07-25']
     # train_val = train[train['create_date'] >= '2017-07-25']
     # # print train_val.shape
