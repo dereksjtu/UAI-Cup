@@ -65,10 +65,10 @@ def training_offline(train,test):
     train_feats,test_feats = get_feats(train,test)
     print np.setdiff1d(train_feats.columns,test_feats.columns)
     print np.setdiff1d(test_feats.columns,train_feats.columns)
-    do_not_use_list = ['create_date','demand_count','estimate_distance_mean','estimate_money_mean','estimate_term_mean','test_id']
+    do_not_use_list = ['create_date','demand_count','estimate_distance_mean','estimate_money_mean','estimate_term_mean','test_id','dayOfWeek','demand_count_start_h_rate']
     predictors = [f for f in train_feats.columns if f not in do_not_use_list]
     print predictors
-    train_feats = train_feats[train_feats['create_date'] >= '2017-07-22'].copy()
+    # train_feats = train_feats[train_feats['create_date'] >= '2017-07-01'].copy()
 
     # import xgboost as xgb
     # params = {'min_child_weight': 10, 'eta': 0.05, 'colsample_bytree': 0.8, 'max_depth': 8,
@@ -122,11 +122,12 @@ def training_online(train,test):
     train_feats,test_feats = get_feats(train,test)
     print np.setdiff1d(train_feats.columns,test_feats.columns)
     print np.setdiff1d(test_feats.columns,train_feats.columns)
-    do_not_use_list = ['create_date','demand_count','estimate_distance_mean','estimate_money_mean','estimate_term_mean','test_id']
+    # do_not_use_list = ['create_date','demand_count','estimate_distance_mean','estimate_money_mean','estimate_term_mean','test_id']
+    do_not_use_list = ['create_date','demand_count','estimate_distance_mean','estimate_money_mean','estimate_term_mean','test_id','dayOfWeek','demand_count_start_h_rate']
     predictors = [f for f in train_feats.columns if f not in do_not_use_list]
     print predictors
 
-    train_feats = train_feats[train_feats['create_date'] >= '2017-07-22'].copy()
+    # train_feats = train_feats[train_feats['create_date'] >= '2017-07-22'].copy()
     # import xgboost as xgb
     # params = {'min_child_weight': 100, 'eta': 0.05, 'colsample_bytree': 0.8, 'max_depth': 8,
     #                 'subsample': 0.8, 'lambda': 1, 'nthread': 4, 'booster' : 'gbtree', 'silent': 1,
@@ -194,9 +195,17 @@ if __name__ == '__main__':
     test = pd.read_csv(test_path,encoding='gbk')
 
     train = reshape_train(train_jul)
-    # valid = valid_split(train_aug)
-    # training_offline(train,valid)
 
+    # # Offline
+    # train_tr = train[train['create_date'] >= '2017-07-01']
+    # train_tr = train[train['create_date'] < '2017-07-25']
+    # train_val = train[train['create_date'] >= '2017-07-25']
+    # # print train_val.shape
+    # valid = valid_split(train_val)
+    # training_offline(train_tr,valid)
+
+    # Online
+    train = train[train['create_date'] >= '2017-07-08']
     training_online(train,test)
     print(u'一共用时{}秒'.format(time.time()-t0))
 

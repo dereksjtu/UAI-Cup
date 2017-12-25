@@ -21,12 +21,21 @@ def reshape_train(train):
     coord_jul.loc[:,'estimate_term_mean'] = train.groupby(['create_date','create_hour','start_geo_id','end_geo_id'],as_index=False)['estimate_term'].mean()['estimate_term']
     return coord_jul
 
-def valid_split(train_aug,Shuffle=False):
-    result_path = cache_path + 'valid_%d.hdf' %(train_aug.shape[0])
+def valid_split(train_valid,Shuffle=False):
+    result_path = cache_path + 'valid_%d.hdf' %(train_valid.shape[0])
     if os.path.exists(result_path) & (Shuffle == False):
         valid = pd.read_hdf(result_path, 'w')
     else:
-        coord_aug = train_aug.groupby(['create_date','create_hour','start_geo_id','end_geo_id'],as_index=False)['start_geo_id'].agg({'demand_count':'count'})
+        train_valid.loc[:,'date_odd'] = train_valid['create_date'].map(lambda x: int(str(x).split('-')[2]) % 2)
+        train_valid.loc[:,'hour_odd'] = train_valid['create_hour'].map(lambda x: int(x) % 2)
+        # print train_val['date_odd'].value_counts()
+        # print train_val['hour_odd'].value_counts()
+        print train_valid.shape
+        train_odd = train_valid[((train_valid['date_odd'] == 1) & (train_valid['hour_odd'] == 1))]
+        train_even = train_valid[((train_valid['date_odd'] == 0) & (train_valid['hour_odd'] == 0))]
+        train_valid = pd.concat([train_odd,train_even],axis=0)
+        del train_valid['date_odd'],train_valid['hour_odd']
+        coord_aug = train_valid.groupby(['create_date','create_hour','start_geo_id','end_geo_id'],as_index=False)['start_geo_id'].agg({'demand_count':'count'})
         dict_list = {
             'l_50' : [0,1,2,3,4,5],
             'l_100' : [6],
@@ -163,6 +172,67 @@ def get_hour_demand(train,test):
     coord_hour = train.groupby(['create_hour','start_geo_id','end_geo_id'],as_index=False)['demand_count'].agg({'demand_count_h_std':'std'})
     train = pd.merge(train,coord_hour,on=['create_hour','start_geo_id','end_geo_id'],how='left')
     test = pd.merge(test,coord_hour,on=['create_hour','start_geo_id','end_geo_id'],how='left')
+
+    coord_hour_s = train.groupby(['create_hour','start_geo_id'],as_index=False)['demand_count'].agg({'demand_count_same_start_h_avg':'mean'})
+    coord_hour_e = train.groupby(['create_hour','end_geo_id'],as_index=False)['demand_count'].agg({'demand_count_same_end_h_avg':'mean'})
+    train = pd.merge(train,coord_hour_s,on=['create_hour','start_geo_id'],how='left')
+    test = pd.merge(test,coord_hour_s,on=['create_hour','start_geo_id'],how='left')
+    train = pd.merge(train,coord_hour_e,on=['create_hour','end_geo_id'],how='left')
+    test = pd.merge(test,coord_hour_e,on=['create_hour','end_geo_id'],how='left')
+
+    train.loc[:,'demand_count_start_h_rate'] = train['demand_count_h_avg'] / (train['demand_count_same_start_h_avg'] + 0.01)
+    test.loc[:,'demand_count_start_h_rate'] = test['demand_count_h_avg'] / (test['demand_count_same_start_h_avg'] + 0.01)
+    train.loc[:,'demand_count_end_h_rate'] = train['demand_count_h_avg'] / (train['demand_count_same_end_h_avg'] + 0.01)
+    test.loc[:,'demand_count_end_h_rate'] = test['demand_count_h_avg'] / (test['demand_count_same_end_h_avg'] + 0.01)
+    del train['demand_count_same_end_h_avg'],train['demand_count_same_start_h_avg']
+    del test['demand_count_same_end_h_avg'],test['demand_count_same_start_h_avg']
+
+    return train, test
+
+def get_hour_loc_cls_demand(train,test):
+    coord_hour = train.groupby(['create_hour','start_cluster','end_cluster'],as_index=False)['demand_count'].agg({'demand_count_cls_h_avg':'mean'})
+    train = pd.merge(train,coord_hour,on=['create_hour','start_cluster','end_cluster'],how='left')
+    test = pd.merge(test,coord_hour,on=['create_hour','start_cluster','end_cluster'],how='left')
+    coord_hour = train.groupby(['create_hour','start_cluster','end_cluster'],as_index=False)['demand_count'].agg({'demand_count_cls_h_median':'median'})
+    train = pd.merge(train,coord_hour,on=['create_hour','start_cluster','end_cluster'],how='left')
+    test = pd.merge(test,coord_hour,on=['create_hour','start_cluster','end_cluster'],how='left')
+    coord_hour = train.groupby(['create_hour','start_cluster','end_cluster'],as_index=False)['demand_count'].agg({'demand_count_cls_h_max':'max'})
+    train = pd.merge(train,coord_hour,on=['create_hour','start_cluster','end_cluster'],how='left')
+    test = pd.merge(test,coord_hour,on=['create_hour','start_cluster','end_cluster'],how='left')
+    coord_hour = train.groupby(['create_hour','start_cluster','end_cluster'],as_index=False)['demand_count'].agg({'demand_count_cls_h_std':'std'})
+    train = pd.merge(train,coord_hour,on=['create_hour','start_cluster','end_cluster'],how='left')
+    test = pd.merge(test,coord_hour,on=['create_hour','start_cluster','end_cluster'],how='left')
+
+    coord_hour_s = train.groupby(['create_hour','start_cluster'],as_index=False)['demand_count'].agg({'demand_count_same_start_cls_h_avg':'mean'})
+    coord_hour_e = train.groupby(['create_hour','end_cluster'],as_index=False)['demand_count'].agg({'demand_count_same_end_cls_h_avg':'mean'})
+    train = pd.merge(train,coord_hour_s,on=['create_hour','start_cluster'],how='left')
+    test = pd.merge(test,coord_hour_s,on=['create_hour','start_cluster'],how='left')
+    train = pd.merge(train,coord_hour_e,on=['create_hour','end_cluster'],how='left')
+    test = pd.merge(test,coord_hour_e,on=['create_hour','end_cluster'],how='left')
+
+    train.loc[:,'demand_count_start_h_rate'] = train['demand_count_h_avg'] / (train['demand_count_same_start_cls_h_avg'] + 0.01)
+    test.loc[:,'demand_count_start_h_rate'] = test['demand_count_h_avg'] / (test['demand_count_same_start_cls_h_avg'] + 0.01)
+    train.loc[:,'demand_count_end_h_rate'] = train['demand_count_h_avg'] / (train['demand_count_same_end_cls_h_avg'] + 0.01)
+    test.loc[:,'demand_count_end_h_rate'] = test['demand_count_h_avg'] / (test['demand_count_same_end_cls_h_avg'] + 0.01)
+    del train['demand_count_same_end_cls_h_avg'],train['demand_count_same_start_cls_h_avg']
+    del test['demand_count_same_end_cls_h_avg'],test['demand_count_same_start_cls_h_avg']
+
+    return train, test
+
+def get_hour_cls_demand(train,test):
+    coord_hour = train.groupby(['hour_cls','start_geo_id','end_geo_id'],as_index=False)['demand_count'].agg({'demand_count_hc_avg':'mean'})
+    train = pd.merge(train,coord_hour,on=['hour_cls','start_geo_id','end_geo_id'],how='left')
+    test = pd.merge(test,coord_hour,on=['hour_cls','start_geo_id','end_geo_id'],how='left')
+    coord_hour = train.groupby(['hour_cls','start_geo_id','end_geo_id'],as_index=False)['demand_count'].agg({'demand_count_hc_median':'median'})
+    train = pd.merge(train,coord_hour,on=['hour_cls','start_geo_id','end_geo_id'],how='left')
+    test = pd.merge(test,coord_hour,on=['hour_cls','start_geo_id','end_geo_id'],how='left')
+    coord_hour = train.groupby(['hour_cls','start_geo_id','end_geo_id'],as_index=False)['demand_count'].agg({'demand_count_hc_max':'max'})
+    train = pd.merge(train,coord_hour,on=['hour_cls','start_geo_id','end_geo_id'],how='left')
+    test = pd.merge(test,coord_hour,on=['hour_cls','start_geo_id','end_geo_id'],how='left')
+    coord_hour = train.groupby(['hour_cls','start_geo_id','end_geo_id'],as_index=False)['demand_count'].agg({'demand_count_hc_std':'std'})
+    train = pd.merge(train,coord_hour,on=['hour_cls','start_geo_id','end_geo_id'],how='left')
+    test = pd.merge(test,coord_hour,on=['hour_cls','start_geo_id','end_geo_id'],how='left')
+
     return train, test
 
 def get_feats(train,test):
@@ -172,4 +242,6 @@ def get_feats(train,test):
     train,test = get_loc_feats(train,test)
     train,test = time_handler(train,test)
     train,test = get_hour_demand(train,test)
+    train,test = get_hour_loc_cls_demand(train,test)
+    train,test = get_hour_cls_demand(train,test)
     return train,test
