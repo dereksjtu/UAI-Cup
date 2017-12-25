@@ -144,7 +144,7 @@ def training_online(train,test):
     print np.setdiff1d(train_feats.columns,test_feats.columns)
     print np.setdiff1d(test_feats.columns,train_feats.columns)
     # do_not_use_list = ['create_date','demand_count','estimate_distance_mean','estimate_money_mean','estimate_term_mean','test_id']
-    do_not_use_list = ['create_date','demand_count','estimate_distance_mean','estimate_money_mean','estimate_term_mean','test_id','demand_count_start_h_rate']
+    do_not_use_list = ['create_date','demand_count','estimate_distance_mean','estimate_money_mean','estimate_term_mean','test_id','demand_count_start_h_rate','start_cluster','end_cluster']
     predictors = [f for f in train_feats.columns if f not in do_not_use_list]
     print predictors
 
@@ -247,7 +247,7 @@ if __name__ == '__main__':
     # training_offline(train_tr,valid)
 
     # Online
-    train = train[train['create_date'] >= '2017-07-01']
+    train = train[train['create_date'] >= '2017-07-08']
     train = exclude_abnormal_value(train)
     training_online(train,test)
     print(u'一共用时{}秒'.format(time.time()-t0))
