@@ -74,7 +74,7 @@ def training_offline(train,test):
     train_feats,test_feats = get_feats(train,test)
     print np.setdiff1d(train_feats.columns,test_feats.columns)
     print np.setdiff1d(test_feats.columns,train_feats.columns)
-    do_not_use_list = ['create_date','demand_count','estimate_distance_mean','estimate_money_mean','estimate_term_mean','test_id','demand_count_start_h_rate']
+    do_not_use_list = ['create_date','demand_count','estimate_distance_mean','estimate_money_mean','estimate_term_mean','test_id','demand_count_start_h_rate','demand_count_weekday_max']
     predictors = [f for f in train_feats.columns if f not in do_not_use_list]
     print predictors
     # train_feats = train_feats[train_feats['create_date'] >= '2017-07-01'].copy()
@@ -202,6 +202,26 @@ def training_online(train,test):
     test[['test_id','count']].to_csv('result.csv',index=False)
 
 
+def exclude_abnormal_value(train):
+    coord = train.groupby(['create_hour','start_geo_id','end_geo_id'],as_index=False)['demand_count'].agg({'mean':'mean'})
+    train = pd.merge(train, coord, on=['create_hour','start_geo_id','end_geo_id'],how='left')
+    coord = train.groupby(['create_hour','start_geo_id','end_geo_id'],as_index=False)['demand_count'].agg({'std':'std'})
+    train = pd.merge(train, coord, on=['create_hour','start_geo_id','end_geo_id'],how='left')
+    train['mean'].fillna(method='bfill',inplace=True)
+    train['std'].fillna(method='bfill',inplace=True)
+    train.loc[:,'demand_count_min'] = train['mean'] - 2 * train['std']
+    train.loc[:,'demand_count_max'] = train['mean'] + 2 * train['std']
+    train['demand_count_max'] = np.ceil(train['demand_count_max'])
+    max_bool = train['demand_count_max'] < train['demand_count']
+    train['demand_count'][max_bool] = train['demand_count_max'][max_bool]
+    neg_bool = train['demand_count_min'] < 0
+    train['demand_count_min'][neg_bool] = 0
+    min_bool = train['demand_count_min'] > train['demand_count']
+    train['demand_count'][min_bool] = train['demand_count_min'][min_bool]
+    train['demand_count'] = np.ceil(train['demand_count'])
+    del train['demand_count_min'],train['demand_count_max'],train['std'],train['mean']
+    return train
+
 
 if __name__ == '__main__':
     t0 = time.time()
@@ -218,15 +238,17 @@ if __name__ == '__main__':
     train = reshape_train(train_jul)
 
     # # Offline
-    # train_tr = train[train['create_date'] >= '2017-07-08']
+    # train_tr = train[train['create_date'] >= '2017-07-01']
     # train_tr = train[train['create_date'] < '2017-07-25']
     # train_val = train[train['create_date'] >= '2017-07-25']
     # # print train_val.shape
+    # train_tr = exclude_abnormal_value(train_tr)
     # valid = valid_split(train_val)
     # training_offline(train_tr,valid)
 
     # Online
-    train = train[train['create_date'] >= '2017-07-08']
+    train = train[train['create_date'] >= '2017-07-01']
+    train = exclude_abnormal_value(train)
     training_online(train,test)
     print(u'一共用时{}秒'.format(time.time()-t0))
 

@@ -36,6 +36,7 @@ def valid_split(train_valid,Shuffle=False):
         train_valid = pd.concat([train_odd,train_even],axis=0)
         del train_valid['date_odd'],train_valid['hour_odd']
         coord_aug = train_valid.groupby(['create_date','create_hour','start_geo_id','end_geo_id'],as_index=False)['start_geo_id'].agg({'demand_count':'count'})
+        # coord_aug = train_valid.groupby(['create_hour'],as_index=False)['create_hour'].agg({'demand_count':'count'})
         dict_list = {
             'l_50' : [0,1,2,3,4,5],
             'l_100' : [6],
@@ -58,6 +59,7 @@ def valid_split(train_valid,Shuffle=False):
                 valid = pd.concat([valid,tmp_valid],axis=0)
         valid.sort_values(['create_date','create_hour'],inplace=True)
         valid.to_hdf(result_path, 'w', complib='blosc', complevel=5)
+        # valid = train_valid
     return valid
 
 def get_hol_feats(train,test):
